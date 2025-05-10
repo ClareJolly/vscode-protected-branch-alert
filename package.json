@@ -1,0 +1,55 @@
+{
+	"name": "protected-branch-alert",
+	"displayName": "Protected Branch Alert",
+	"description": "Warns you when editing on protected Git branches like main or production or master (or a protected branch you specify).",
+	"version": "1.0.0",
+	"engines": {
+		"vscode": "^1.60.0"
+	},
+	"categories": [
+		"Other"
+	],
+	"icon": "images/branch-protect.png",
+	"keywords": [
+		"git",
+		"branch",
+		"alert",
+		"protected"
+	],
+	"license": "MIT",
+	"publisher": "ClareJolly",
+	"activationEvents": [
+		"onStartupFinished",
+		"onDidChangeActiveTextEditor"
+	],
+	"main": "./out/build/extension.js",
+	"contributes": {
+		"configuration": {
+			"title": "Branch Alert",
+			"properties": {
+				"branchAlert.protectedBranches": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": [
+						"main",
+						"master"
+					],
+					"description": "List of Git branches to warn about when editing files."
+				}
+			}
+		}
+	},
+	"scripts": {
+		"prepublish": "tsc -p ./",
+		"package": "mkdir -p out/dist && vsce package --out out/dist/protected-branch-alert.vsix"
+	},
+	"devDependencies": {
+		"@types/vscode": "^1.60.0",
+		"@types/node": "22.15.17",
+		"typescript": "^4.0.0",
+		"tslint": "^6.1.0",
+		"vscode": "^1.1.37"
+	}
+}
