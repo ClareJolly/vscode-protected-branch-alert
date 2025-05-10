@@ -34,6 +34,8 @@ If you're installing the extension manually (not from the VS Code Marketplace):
 1. From the root of the extension, run:
 
    ```bash
+   npm run compile
+
    npm run package
    ```
 

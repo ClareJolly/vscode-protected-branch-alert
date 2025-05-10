@@ -1,10 +1,12 @@
 import * as vscode from 'vscode';
 import {
 	getCurrentGitBranch,
-	startReminderTimer,
 	createStatusBarItem,
 	resetReminderTimer,
+	handleEdit,
 } from './helpers';
+
+let branchPollInterval: NodeJS.Timeout;
 
 export const activate = (context: vscode.ExtensionContext) => {
 	const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -46,45 +48,36 @@ export const activate = (context: vscode.ExtensionContext) => {
 		}
 	};
 
-	const onEdit = () => {
-		if (currentlyOnProtectedBranch && !warnedThisBranch) {
-			warnedThisBranch = true;
-			vscode.window
-				.showWarningMessage(
-					`You're editing files on the protected branch "${currentBranch}".`,
-					'Create New Branch',
-					'Ignore'
-				)
-				.then((selection) => {
-					if (selection === 'Create New Branch') {
-						vscode.commands.executeCommand('git.branch');
-					}
-					reminderTimeout = startReminderTimer(currentBranch, () => {
-						warnedThisBranch = false;
-					});
-				});
-		} else if (currentlyOnProtectedBranch) {
-			resetReminderTimer(reminderTimeout);
-			reminderTimeout = startReminderTimer(currentBranch, () => {
-				warnedThisBranch = false;
-			});
-		}
-	};
-
 	context.subscriptions.push(
 		vscode.workspace.onDidChangeTextDocument(() => {
-			onEdit();
+			handleEdit({
+				branch: currentBranch,
+				currentlyOnProtectedBranch,
+				warned: warnedThisBranch,
+				setWarned: (v) => (warnedThisBranch = v),
+				reminderTimeout,
+				setReminderTimeout: (t) => (reminderTimeout = t),
+			});
 		})
 	);
 
-	const branchPollInterval = setInterval(() => {
+	const intervalId = setInterval(() => {
 		checkBranch();
 	}, 3000);
+
+	branchPollInterval = intervalId;
+
 	context.subscriptions.push({
-		dispose: () => clearInterval(branchPollInterval),
+		dispose: () => {
+			clearInterval(intervalId);
+		},
 	});
 
 	checkBranch();
 };
 
-export const deactivate = () => {};
+export const deactivate = () => {
+	if (branchPollInterval) {
+		clearInterval(branchPollInterval);
+	}
+};

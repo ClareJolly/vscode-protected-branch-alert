@@ -11,5 +11,6 @@
 		"skipLibCheck": true
 	},
 	"include": ["src"],
-	"exclude": ["out", ".vscode-test"]
+	"exclude": ["out", ".vscode-test"],
+	"isolatedModules": true
 }
