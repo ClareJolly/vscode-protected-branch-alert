@@ -3,6 +3,7 @@
 	"displayName": "Protected Branch Alert",
 	"description": "Warns you when editing on protected Git branches like main or production or master (or a protected branch you specify).",
 	"version": "1.0.0",
+	"repository": "https://github.com/ClareJolly/vscode-protected-branch-alert",
 	"engines": {
 		"vscode": "^1.60.0"
 	},
