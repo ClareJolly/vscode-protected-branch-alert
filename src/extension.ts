@@ -6,11 +6,8 @@ function getCurrentGitBranch(workspacePath: string): Promise<string> {
 		cp.exec(
 			'git rev-parse --abbrev-ref HEAD',
 			{ cwd: workspacePath },
-			(err, stdout, stderr) => {
-				if (err) {
-					console.error('Failed to get current branch:', stderr);
-					return reject(err);
-				}
+			(err, stdout) => {
+				if (err) return reject(err);
 				resolve(stdout.trim());
 			}
 		);
@@ -19,77 +16,116 @@ function getCurrentGitBranch(workspacePath: string): Promise<string> {
 
 export function activate(context: vscode.ExtensionContext) {
 	const workspaceFolders = vscode.workspace.workspaceFolders;
-	if (!workspaceFolders || workspaceFolders.length === 0) {
-		console.warn('No workspace folder open.');
-		return;
-	}
+	if (!workspaceFolders || workspaceFolders.length === 0) return;
 
 	const workspacePath = workspaceFolders[0].uri.fsPath;
-	let lastBranch = '';
-	let hasWarnedThisBranch = false;
+	let currentBranch = '';
+	let warnedThisBranch = false;
+	let reminderTimeout: NodeJS.Timeout | undefined;
+	let currentlyOnProtectedBranch = false;
+
+	const statusBarWarning = vscode.window.createStatusBarItem(
+		vscode.StatusBarAlignment.Left,
+		100
+	);
+	statusBarWarning.text = '$(warning) PROTECTED BRANCH';
+	statusBarWarning.tooltip = 'You are editing a protected Git branch.';
+	statusBarWarning.backgroundColor = new vscode.ThemeColor(
+		'statusBarItem.errorBackground'
+	);
+	statusBarWarning.color = new vscode.ThemeColor(
+		'statusBarItem.errorForeground'
+	);
+	statusBarWarning.hide();
+	context.subscriptions.push(statusBarWarning);
 
 	const getProtectedBranches = (): string[] => {
-		const branches = vscode.workspace
-			.getConfiguration('branchAlert')
-			.get<string[]>('protectedBranches') || ['main', 'master'];
-		console.log('Configured protected branches:', branches);
-		return branches;
+		return (
+			vscode.workspace
+				.getConfiguration('branchAlert')
+				.get<string[]>('protectedBranches') || ['main', 'master']
+		);
 	};
 
-	const warnIfOnProtectedBranch = async () => {
-		console.log('Checking current Git branch...');
+	const resetReminderTimer = () => {
+		if (reminderTimeout) {
+			clearTimeout(reminderTimeout);
+			reminderTimeout = undefined;
+		}
+	};
+
+	const startReminderTimer = (branch: string) => {
+		resetReminderTimer();
+		reminderTimeout = setTimeout(() => {
+			vscode.window
+				.showWarningMessage(
+					`Reminder: you're still editing on the protected branch "${branch}".`,
+					'Create New Branch',
+					'Ignore'
+				)
+				.then((selection) => {
+					if (selection === 'Create New Branch') {
+						vscode.commands.executeCommand('git.branch');
+					}
+					warnedThisBranch = false;
+				});
+		}, 10 * 60 * 1000);
+	};
+
+	const checkBranch = async () => {
 		try {
 			const branch = await getCurrentGitBranch(workspacePath);
-			console.log('Current branch:', branch);
-
 			const protectedBranches = getProtectedBranches();
+			currentBranch = branch;
+			currentlyOnProtectedBranch = protectedBranches.includes(branch);
 
-			if (branch !== lastBranch) {
-				console.log(`Branch changed: ${lastBranch} → ${branch}`);
-				lastBranch = branch;
-				hasWarnedThisBranch = false;
-			}
-
-			if (protectedBranches.includes(branch) && !hasWarnedThisBranch) {
-				hasWarnedThisBranch = true;
-				console.warn(`Editing on protected branch: ${branch}`);
-				vscode.window
-					.showWarningMessage(
-						`You are editing files directly on the "${branch}" branch.`,
-						'Create New Branch',
-						'Ignore'
-					)
-					.then((selection) => {
-						if (selection === 'Create New Branch') {
-							vscode.commands.executeCommand('git.branch');
-						}
-					});
+			if (currentlyOnProtectedBranch) {
+				statusBarWarning.show();
+			} else {
+				statusBarWarning.hide();
+				warnedThisBranch = false;
+				resetReminderTimer();
 			}
 		} catch (e) {
 			console.error('Error checking Git branch:', e);
 		}
 	};
 
-	// Trigger on edit
-	const fileChangeWatcher = vscode.workspace.onDidChangeTextDocument((e) => {
-		console.log('File changed:', e.document.uri.fsPath);
-		warnIfOnProtectedBranch();
-	});
+	const onEdit = () => {
+		if (currentlyOnProtectedBranch && !warnedThisBranch) {
+			warnedThisBranch = true;
+			vscode.window
+				.showWarningMessage(
+					`You're editing files on the protected branch "${currentBranch}".`,
+					'Create New Branch',
+					'Ignore'
+				)
+				.then((selection) => {
+					if (selection === 'Create New Branch') {
+						vscode.commands.executeCommand('git.branch');
+					}
+					startReminderTimer(currentBranch);
+				});
+		} else if (currentlyOnProtectedBranch) {
+			resetReminderTimer();
+			startReminderTimer(currentBranch);
+		}
+	};
 
-	// Periodic check (e.g., for manual branch switch)
+	context.subscriptions.push(
+		vscode.workspace.onDidChangeTextDocument(() => {
+			onEdit();
+		})
+	);
+
 	const branchPollInterval = setInterval(() => {
-		warnIfOnProtectedBranch();
+		checkBranch();
 	}, 3000);
-
-	context.subscriptions.push(fileChangeWatcher);
 	context.subscriptions.push({
 		dispose: () => clearInterval(branchPollInterval),
 	});
 
-	// Initial check
-	warnIfOnProtectedBranch();
+	checkBranch();
 }
 
-export function deactivate() {
-	console.log('Branch alert extension deactivated.');
-}
+export function deactivate() {}

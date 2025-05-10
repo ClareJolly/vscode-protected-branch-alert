@@ -9,6 +9,7 @@ This VS Code extension warns you when you make changes on protected Git branches
 - 🧓 10-minute cooldown between reminders
 - ⚙️ Configurable list of protected branches
 - 🧠 Smart: only alerts when editing, not just sitting on a branch
+- 🔴 Red status bar warning when on a protected branch (always visible)
 
 ## ⚙️ Configuration
 
@@ -23,6 +24,7 @@ To customize which branches trigger alerts, add the following to your VS Code se
 - First edit on a protected branch → shows a warning popup
 - If ignored → reminds you again after 10 minutes (only if you're still editing)
 - If you switch to another branch → timer resets, no more reminders
+- Red status bar alert appears at all times when on a protected branch
 - No alerts while idle — only when you actively edit files
 
 ## 🧪 Local Installation
