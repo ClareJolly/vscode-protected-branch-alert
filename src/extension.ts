@@ -1,20 +1,12 @@
 import * as vscode from 'vscode';
-import * as cp from 'child_process';
+import {
+	getCurrentGitBranch,
+	startReminderTimer,
+	createStatusBarItem,
+	resetReminderTimer,
+} from './helpers';
 
-function getCurrentGitBranch(workspacePath: string): Promise<string> {
-	return new Promise((resolve, reject) => {
-		cp.exec(
-			'git rev-parse --abbrev-ref HEAD',
-			{ cwd: workspacePath },
-			(err, stdout) => {
-				if (err) return reject(err);
-				resolve(stdout.trim());
-			}
-		);
-	});
-}
-
-export function activate(context: vscode.ExtensionContext) {
+export const activate = (context: vscode.ExtensionContext) => {
 	const workspaceFolders = vscode.workspace.workspaceFolders;
 	if (!workspaceFolders || workspaceFolders.length === 0) return;
 
@@ -24,19 +16,7 @@ export function activate(context: vscode.ExtensionContext) {
 	let reminderTimeout: NodeJS.Timeout | undefined;
 	let currentlyOnProtectedBranch = false;
 
-	const statusBarWarning = vscode.window.createStatusBarItem(
-		vscode.StatusBarAlignment.Left,
-		100
-	);
-	statusBarWarning.text = '$(warning) PROTECTED BRANCH';
-	statusBarWarning.tooltip = 'You are editing a protected Git branch.';
-	statusBarWarning.backgroundColor = new vscode.ThemeColor(
-		'statusBarItem.errorBackground'
-	);
-	statusBarWarning.color = new vscode.ThemeColor(
-		'statusBarItem.errorForeground'
-	);
-	statusBarWarning.hide();
+	const statusBarWarning = createStatusBarItem();
 	context.subscriptions.push(statusBarWarning);
 
 	const getProtectedBranches = (): string[] => {
@@ -45,31 +25,6 @@ export function activate(context: vscode.ExtensionContext) {
 				.getConfiguration('branchAlert')
 				.get<string[]>('protectedBranches') || ['main', 'master']
 		);
-	};
-
-	const resetReminderTimer = () => {
-		if (reminderTimeout) {
-			clearTimeout(reminderTimeout);
-			reminderTimeout = undefined;
-		}
-	};
-
-	const startReminderTimer = (branch: string) => {
-		resetReminderTimer();
-		reminderTimeout = setTimeout(() => {
-			vscode.window
-				.showWarningMessage(
-					`Reminder: you're still editing on the protected branch "${branch}".`,
-					'Create New Branch',
-					'Ignore'
-				)
-				.then((selection) => {
-					if (selection === 'Create New Branch') {
-						vscode.commands.executeCommand('git.branch');
-					}
-					warnedThisBranch = false;
-				});
-		}, 10 * 60 * 1000);
 	};
 
 	const checkBranch = async () => {
@@ -84,7 +39,7 @@ export function activate(context: vscode.ExtensionContext) {
 			} else {
 				statusBarWarning.hide();
 				warnedThisBranch = false;
-				resetReminderTimer();
+				resetReminderTimer(reminderTimeout);
 			}
 		} catch (e) {
 			console.error('Error checking Git branch:', e);
@@ -104,11 +59,15 @@ export function activate(context: vscode.ExtensionContext) {
 					if (selection === 'Create New Branch') {
 						vscode.commands.executeCommand('git.branch');
 					}
-					startReminderTimer(currentBranch);
+					reminderTimeout = startReminderTimer(currentBranch, () => {
+						warnedThisBranch = false;
+					});
 				});
 		} else if (currentlyOnProtectedBranch) {
-			resetReminderTimer();
-			startReminderTimer(currentBranch);
+			resetReminderTimer(reminderTimeout);
+			reminderTimeout = startReminderTimer(currentBranch, () => {
+				warnedThisBranch = false;
+			});
 		}
 	};
 
@@ -126,6 +85,6 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	checkBranch();
-}
+};
 
-export function deactivate() {}
+export const deactivate = () => {};
