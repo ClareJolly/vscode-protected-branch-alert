@@ -37,10 +37,18 @@ If you're installing the extension manually (not from the VS Code Marketplace):
    npm run package
    ```
 
+   And choose the type of update - if no version bump needed just choose `keep`
+
    This creates a file like:
 
    ```
    out/dist/protected-branch-alert-1.0.0.vsix
+   ```
+
+   and
+
+   ```
+   out/dist/protected-branch-alert-latest.vsix
    ```
 
 2. Install the .vsix file:
