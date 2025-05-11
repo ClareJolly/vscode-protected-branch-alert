@@ -45,4 +45,8 @@ const bumpVersion = (version, type) => {
 
 	execSync(`npx vsce package --out ${outputPath}`, { stdio: 'inherit' });
 	console.log(`✅ VSIX saved to: ${outputPath}`);
+
+	const latestPath = path.join(outDir, 'protected-branch-alert-latest.vsix');
+	fs.copyFileSync(outputPath, latestPath);
+	console.log(`✅ Copied to latest: ${latestPath}`);
 })();
