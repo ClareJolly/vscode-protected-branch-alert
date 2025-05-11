@@ -10,6 +10,9 @@
 		"types": ["vscode", "node"],
 		"skipLibCheck": true
 	},
-	"include": ["src"],
+	"ts-node": {
+		"esm": true
+	},
+	"include": ["src", "scripts"],
 	"exclude": ["out", ".vscode-test"]
 }
